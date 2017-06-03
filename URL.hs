@@ -4,8 +4,10 @@ import Text.Regex.EDSL
 -- Matches any valid URI, plus some variants of "naked" domains
 url :: Regex
 url = wordBoundary :* (uri :| uriLike)
-    where uriLike = "www." :* validStr :| validStr :* foldr1 (:|) domains
+    where uriLike = "www." :* validStr
+                 :| validStr :* foldr1 (:|) domains :* hardBoundary
 
+          hardBoundary = lookNot Ahead $ charSpecial "S"
           domains = [ ".com", ".net", ".org", ".de", ".co.uk" ]
 
 -- Matches anything that looks like a valid URI
