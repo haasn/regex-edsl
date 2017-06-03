@@ -1,4 +1,5 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DataKinds, KindSignatures, GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DataKinds, KindSignatures, GADTs,
+             ConstraintKinds #-}
 module Text.Regex.EDSL
     -- * Data types
     ( Regex(..)
@@ -57,12 +58,12 @@ data CharLit = AnyChar         -- ^ Any character, i.e. .
 
 data GroupLike where
     -- | Simple, normal group
-    GroupPrim  :: ShowSign x => CharGroup x -> GroupLike
+    GroupPrim  :: IsSign x => CharGroup x -> GroupLike
     -- | Group difference, i.e. [x-[y]]
-    GroupDiff  :: (ShowSign x, ShowSign y)
+    GroupDiff  :: (IsSign x, IsSign y)
                => CharGroup x -> CharGroup y -> GroupLike
     -- | Group intersection, i.e. [x&&[y]]
-    GroupInter :: (ShowSign x, ShowSign y)
+    GroupInter :: (IsSign x, IsSign y)
                => CharGroup x -> CharGroup y -> GroupLike
 
 newtype CharGroup (s :: Sign) = CharGroup [GroupLit]
@@ -144,7 +145,9 @@ class ShowSign (s :: Sign) where showSign :: proxy s -> ShowS
 instance ShowSign Positive where showSign _ = id
 instance ShowSign Negative where showSign _ = showChar '^'
 
-instance ShowSign s => Show (CharGroup s) where
+type IsSign = ShowSign
+
+instance IsSign s => Show (CharGroup s) where
     showsPrec _ c@(CharGroup ls) = foldr (.) id $ showSign c : map shows ls
 
 instance Show GroupLit where
@@ -170,13 +173,13 @@ look, lookNot :: Dir -> Regex -> Regex
 look    = Look False
 lookNot = Look True
 
-charClass :: CharGroup Positive -> Regex
+charClass :: IsSign s => CharGroup s -> Regex
 charClass = Character . Group . GroupPrim
 
-classDiff :: (ShowSign x, ShowSign y) => CharGroup x -> CharGroup y -> Regex
+classDiff :: (IsSign x, IsSign y) => CharGroup x -> CharGroup y -> Regex
 classDiff x = Character . Group . GroupDiff x
 
-classInter :: (ShowSign x, ShowSign y) => CharGroup x -> CharGroup y -> Regex
+classInter :: (IsSign x, IsSign y) => CharGroup x -> CharGroup y -> Regex
 classInter x = Character . Group . GroupInter x
 
 inv :: CharGroup Positive -> CharGroup Negative
