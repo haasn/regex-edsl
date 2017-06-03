@@ -1,5 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DataKinds, KindSignatures, GADTs,
-             ConstraintKinds #-}
+{-# LANGUAGE DataKinds, KindSignatures, GADTs, FlexibleInstances #-}
 module Text.Regex.EDSL
     -- * Data types
     ( Regex(..)
@@ -58,16 +57,23 @@ data CharLit = AnyChar         -- ^ Any character, i.e. .
 
 data GroupLike where
     -- | Simple, normal group
-    GroupPrim  :: IsSign x => CharGroup x -> GroupLike
+    GroupPrim  :: CharGroup x -> GroupLike
     -- | Group difference, i.e. [x-[y]]
-    GroupDiff  :: (IsSign x, IsSign y)
-               => CharGroup x -> CharGroup y -> GroupLike
+    GroupDiff  :: CharGroup x -> CharGroup y -> GroupLike
     -- | Group intersection, i.e. [x&&[y]]
-    GroupInter :: (IsSign x, IsSign y)
-               => CharGroup x -> CharGroup y -> GroupLike
+    GroupInter :: CharGroup x -> CharGroup y -> GroupLike
 
-newtype CharGroup (s :: Sign) = CharGroup [GroupLit]
-    deriving Monoid
+data CharGroup (s :: Sign) where
+    PosGroup :: [GroupLit] -> CharGroup Positive
+    NegGroup :: [GroupLit] -> CharGroup Negative
+
+instance Monoid (CharGroup Positive) where
+    mempty = PosGroup mempty
+    PosGroup x `mappend` PosGroup y = PosGroup $ x `mappend` y
+
+instance Monoid (CharGroup Negative) where
+    mempty = NegGroup mempty
+    NegGroup x `mappend` NegGroup y = NegGroup $ x `mappend` y
 
 -- | Literals valid inside a character group/class
 data GroupLit = GSingle Char     -- ^ Literal character
@@ -78,7 +84,7 @@ instance IsString Regex where
     fromString = foldr1 (:*) . map (Character . Single)
 
 instance s ~ Positive => IsString (CharGroup s) where
-    fromString = CharGroup . map GSingle
+    fromString = PosGroup . map GSingle
 
 -- Operator precedence table
 prec_or : prec_and : prec_qty : _ = [1..]
@@ -141,14 +147,9 @@ instance Show GroupLike where
     showsPrec _ (GroupInter x y) = showChar '[' . shows x . showString "&&["
                                  . shows y . showString "]]"
 
-class ShowSign (s :: Sign) where showSign :: proxy s -> ShowS
-instance ShowSign Positive where showSign _ = id
-instance ShowSign Negative where showSign _ = showChar '^'
-
-type IsSign = ShowSign
-
-instance IsSign s => Show (CharGroup s) where
-    showsPrec _ c@(CharGroup ls) = foldr (.) id $ showSign c : map shows ls
+instance Show (CharGroup s) where
+    showsPrec _ (PosGroup ls) = foldr (.) id $ map shows ls
+    showsPrec _ (NegGroup ls) = foldr (.) id $ showChar '^' : map shows ls
 
 instance Show GroupLit where
     showsPrec _ (GSingle c)  = escape "^-]\\" c
@@ -173,26 +174,26 @@ look, lookNot :: Dir -> Regex -> Regex
 look    = Look False
 lookNot = Look True
 
-charClass :: IsSign s => CharGroup s -> Regex
+charClass :: CharGroup s -> Regex
 charClass = Character . Group . GroupPrim
 
-classDiff :: (IsSign x, IsSign y) => CharGroup x -> CharGroup y -> Regex
+classDiff :: CharGroup x -> CharGroup y -> Regex
 classDiff x = Character . Group . GroupDiff x
 
-classInter :: (IsSign x, IsSign y) => CharGroup x -> CharGroup y -> Regex
+classInter :: CharGroup x -> CharGroup y -> Regex
 classInter x = Character . Group . GroupInter x
 
 inv :: CharGroup Positive -> CharGroup Negative
-inv (CharGroup x) = CharGroup x
+inv (PosGroup x) = NegGroup x
 
-range :: Char -> Char -> CharGroup s
-range a b = CharGroup [GRange a b]
+range :: Char -> Char -> CharGroup Positive
+range a b = PosGroup [GRange a b]
 
-groupSpecial :: String -> CharGroup s
-groupSpecial = CharGroup . pure . GSpecial
+groupSpecial :: String -> CharGroup Positive
+groupSpecial = PosGroup . pure . GSpecial
 
-wordChar :: CharGroup s
+wordChar :: CharGroup Positive
 wordChar = groupSpecial "w"
 
-digit :: CharGroup s
+digit :: CharGroup Positive
 digit = groupSpecial "d"
