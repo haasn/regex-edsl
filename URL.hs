@@ -31,7 +31,7 @@ safeLetter = charClass (safeChars <> groupSpecial "p{N}" <> groupSpecial "p{S}")
 -- This matches any safe letter, plus risky punctuation
 riskyLetter :: Regex
 riskyLetter = safeLetter :| charClass riskyChars
-           :| lookNot Ahead "()[]" :* charSpecial "p{P}"
+           :| lookNot Ahead (charClass "()[]") :* charSpecial "p{P}"
 
 -- Valid character sequence that can be part of a URL
 validStr :: Regex
