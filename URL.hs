@@ -14,7 +14,7 @@ url = wordBoundary :* (uri :| uriLike)
 uri :: Regex
 uri = scheme :* validStr
     where scheme = foldr1 (:|) protos :* ":"
-          protos = [ "http" :* Opt "s", "ftp", "file", "mailto", "magnet" ]
+          protos = [ "http" :* Opt "s", "ftp", "file", "mailto", "magnet", "git" ]
 
 -- Risky chars could be URL separators instead of part of the URL, so try
 -- not matching them if they're the last thing in the URL
